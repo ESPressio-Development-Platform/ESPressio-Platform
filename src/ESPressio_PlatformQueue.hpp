@@ -51,7 +51,7 @@ struct IsQueue<
         decltype(std::declval<const TQueue&>().Size()),
         decltype(std::declval<TQueue&>().Reset())>>
     : std::bool_constant<
-          TDepth > 0U &&
+          (TDepth > 0U) &&
           static_cast<std::size_t>(TQueue::Depth) == TDepth &&
           static_cast<std::size_t>(TQueue::ElementSizeBytes) == sizeof(TElement) &&
           static_cast<std::size_t>(TQueue::PayloadStorageBytes) == sizeof(TElement) * TDepth &&
