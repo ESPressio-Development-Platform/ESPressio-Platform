@@ -124,7 +124,7 @@ struct IsQueueProvider<
         typename T::PlatformCapabilities,
         typename T::template Queue<std::uint32_t, 2U>>>
     : std::bool_constant<
-          IsProviderV<T> &&
+          ESPressio::Platform::IsProviderV<T> &&
           T::PlatformCapabilities::template Contains<Capability::Queue> &&
           IsQueue<typename T::template Queue<std::uint32_t, 2U>, std::uint32_t, 2U>::value &&
           (!T::PlatformCapabilities::template Contains<Capability::StaticQueueStorage> ||

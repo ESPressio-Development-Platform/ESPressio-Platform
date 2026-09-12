@@ -116,7 +116,7 @@ struct IsSynchronizationProvider<
         typename T::Mutex,
         typename T::Signal>>
     : std::bool_constant<
-          IsProviderV<T> &&
+          ESPressio::Platform::IsProviderV<T> &&
           T::PlatformCapabilities::template Contains<Capability::Synchronization> &&
           IsMutex<typename T::Mutex>::value &&
           IsSignal<typename T::Signal>::value &&
