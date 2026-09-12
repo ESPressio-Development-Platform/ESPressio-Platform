@@ -128,6 +128,20 @@ static_assert(MyPlatform::PropertyValue<Capability::Clock,
 
 `ProviderFor<Capability>` and direct property inspection deliberately require a unique provider. Shared capabilities may have multiple contributors; requirements against shared capabilities are satisfied when at least one contributing provider meets the requested constraints.
 
+## Bus I/O and GPIO
+
+Bus and GPIO contracts are deliberately multi-instance rather than global singletons.
+
+`I2C::DeviceProviderDeclaration` represents a bound I2C endpoint identified by a device tag. Address, address width and requested bus frequency are compile-time properties. The portable endpoint contract provides write, read and repeated-START write/read operations over non-owning byte views.
+
+`SPI::DeviceProviderDeclaration` similarly binds a device tag, frequency, mode and bit order. Its minimum contract is a full-duplex transfer operation. Chip-select is intentionally not imposed by the portable SPI contract, allowing software GPIO CS and backend-managed hardware CS to coexist.
+
+GPIO providers are domain-tagged. `GPIO::DefaultDomain` maps to the generic `Capability::GPIO`, while additional domains use `Capability::GPIODomain<Tag>` so an MCU GPIO controller and one or more external expanders can coexist in a composition. Stronger GPIO behavior is expressed through separate feature capabilities such as pull-up, pull-down, open-drain, bidirectional operation and interrupts.
+
+All three contracts distinguish compile-time structural support from runtime availability. A selected provider can satisfy a requirement statically while still reporting a runtime driver/device/resource failure through `IO::Result`.
+
+See `docs/BUS_GPIO.md` for the detailed contract rationale.
+
 ## Backend libraries
 
 Concrete platform implementations live in sibling repositories:
@@ -136,7 +150,7 @@ Concrete platform implementations live in sibling repositories:
 - `ESPressio-Platform-FreeRTOS`
 - `ESPressio-Platform-ESP-IDF`
 
-Those libraries declare distinct backend identities and will implement the contracts owned here. A single firmware composition may deliberately contain providers from more than one backend.
+Those libraries declare distinct backend identities and implement only contracts their underlying environment genuinely provides. A single firmware composition may deliberately contain providers from more than one backend.
 
 ## Design rules
 
@@ -151,11 +165,4 @@ Those libraries declare distinct backend identities and will implement the contr
 
 ## Validation
 
-`tests/run_native_tests.sh` compiles the positive C++17 test and also verifies that invalid compositions fail compilation. Negative coverage includes:
-
-- duplicate exclusive providers;
-- missing provider dependencies;
-- missing consumer capabilities;
-- duplicate property declarations;
-- provider-side quantitative requirements that are not met;
-- consumer-side quantitative requirements that are not met.
+`tests/run_native_tests.sh` compiles the positive C++17 tests and also verifies that invalid compositions fail compilation. Negative coverage includes duplicate exclusive providers, missing provider dependencies, missing consumer capabilities, duplicate property declarations, unsatisfied quantitative requirements, and duplicate providers for the same bound I2C endpoint.
