@@ -142,6 +142,24 @@ All three contracts distinguish compile-time structural support from runtime ava
 
 See `docs/BUS_GPIO.md` for the detailed contract rationale.
 
+## ByteStream
+
+`ByteStream::ProviderDeclaration` defines a readable/writable byte-stream service with explicit availability and transfer counts. `ByteStream::DefaultStream` maps to the canonical `Capability::ByteStream`; additional tagged streams use `Capability::ByteStreamEndpoint<Tag>` so a serial console, modem, file-like transport, network client, or hardware-specific stream can coexist in one Platform composition.
+
+The portable contract is deliberately small:
+
+- `Available(std::size_t&)` reports bytes immediately available for reading;
+- `Read(IO::MutableBuffer)` returns `IO::TransferResult`;
+- `Write(IO::ConstBuffer)` returns `IO::TransferResult`.
+
+A successful transfer may be partial. The returned count is always authoritative, and `IO::TransferResult::Completed(requested)` is provided when a caller requires an exact-length operation. The generic contract does not invent a universal timeout or non-blocking-write policy because those guarantees differ materially between stream implementations.
+
+## Entropy
+
+`Entropy::ProviderDeclaration` defines one selected entropy/random-byte source through `Fill(IO::MutableBuffer)`. Returning `IO::Result::Ok` means the entire requested buffer has been populated; partial entropy fills are not part of the generic contract.
+
+`Capability::HardwareRandomGenerator` may additionally be advertised when a provider is physically backed by a hardware RNG. This feature describes provenance only. `ESPressio-Platform` intentionally defines no fixed entropy-bits or cryptographic-strength property because those guarantees may depend on runtime hardware state, initialization, or an active physical noise source. Hardware-specific libraries may implement the same Entropy contract without belonging to an Arduino, ESP-IDF, or FreeRTOS backend.
+
 ## Backend libraries
 
 Concrete platform implementations live in sibling repositories:
@@ -165,4 +183,4 @@ Those libraries declare distinct backend identities and implement only contracts
 
 ## Validation
 
-`tests/run_native_tests.sh` compiles the positive C++17 tests and also verifies that invalid compositions fail compilation. Negative coverage includes duplicate exclusive providers, missing provider dependencies, missing consumer capabilities, duplicate property declarations, unsatisfied quantitative requirements, and duplicate providers for the same bound I2C endpoint.
+`tests/run_native_tests.sh` compiles the positive C++17 tests and also verifies that invalid compositions fail compilation. Negative coverage includes duplicate exclusive providers, missing provider dependencies, missing consumer capabilities, duplicate property declarations, unsatisfied quantitative requirements, duplicate providers for the same bound I2C endpoint, and duplicate providers for the same tagged ByteStream endpoint.
