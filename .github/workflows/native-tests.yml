@@ -1,0 +1,13 @@
+name: Native capability tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile positive and negative capability contracts
+        run: bash tests/run_native_tests.sh
