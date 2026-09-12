@@ -9,10 +9,11 @@ FLAGS=(-std=gnu++17 -Wall -Wextra -Werror -pedantic -I"${ROOT}/src")
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 
-"${CXX}" "${FLAGS[@]}" \
-  "${ROOT}/tests/native/platform_capabilities_test.cpp" \
-  -o "${BUILD_DIR}/platform_capabilities_test"
-"${BUILD_DIR}/platform_capabilities_test"
+for source in "${ROOT}"/tests/native/*.cpp; do
+  name="$(basename "${source}" .cpp)"
+  "${CXX}" "${FLAGS[@]}" "${source}" -o "${BUILD_DIR}/${name}"
+  "${BUILD_DIR}/${name}"
+done
 
 for source in "${ROOT}"/tests/negative/*.cpp; do
   name="$(basename "${source}" .cpp)"
@@ -23,4 +24,4 @@ for source in "${ROOT}"/tests/negative/*.cpp; do
   fi
 done
 
-echo "ESPressio-Platform native capability tests passed"
+echo "ESPressio-Platform native contract tests passed"
