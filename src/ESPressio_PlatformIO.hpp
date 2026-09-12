@@ -37,6 +37,17 @@ struct MutableBuffer {
     constexpr operator ConstBuffer() const noexcept { return {Data, Size}; }
 };
 
+/** Result of an operation that may transfer fewer bytes than requested. */
+struct TransferResult {
+    Result Status{Result::Ok};
+    std::size_t Count{0U};
+
+    constexpr bool Succeeded() const noexcept { return Status == Result::Ok; }
+    constexpr bool Completed(std::size_t requested) const noexcept {
+        return Status == Result::Ok && Count == requested;
+    }
+};
+
 constexpr ConstBuffer Bytes(const std::uint8_t* data, std::size_t size) noexcept {
     return {data, size};
 }
