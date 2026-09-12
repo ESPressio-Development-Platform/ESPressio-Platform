@@ -53,80 +53,42 @@ using FastClock =
         PropertyAtLeast<PropertyKey::ClockFrequencyHz,
                         std::uint64_t{1'000'000}>>;
 
-using Required =
-    RequirementSet<
-        Capability::Execution,
-        FastClock>;
-
+using Required = RequirementSet<Capability::Execution, FastClock>;
 using ValidatedPlatform = RequireT<MyPlatform, Required>;
 ```
 
 `RequireT` fails compilation if the required capability is absent, if the required property is absent, or if the declared property value does not satisfy the constraint.
 
-The generic constraint vocabulary currently includes:
+The generic constraint vocabulary includes `PropertyEquals`, `PropertyAtLeast`, `PropertyAtMost`, `PropertyGreaterThan`, and `PropertyLessThan`.
 
-- `PropertyEquals`
-- `PropertyAtLeast`
-- `PropertyAtMost`
-- `PropertyGreaterThan`
-- `PropertyLessThan`
-
-A provider may also depend on a quantitative property of another provider:
-
-```cpp
-using DualCoreExecution =
-    CapabilityRequirement<
-        Capability::Execution,
-        PropertyAtLeast<PropertyKey::ProcessorCount, std::size_t{2}>>;
-
-struct SynchronizationProvider final
-    : ProviderDeclaration<
-          MyBackend,
-          CapabilitySet<Capability::Synchronization>,
-          RequirementSet<DualCoreExecution>> {};
-```
-
-A composition containing `SynchronizationProvider` and only a single-core execution provider is ill-formed at compile time.
+A provider may itself require capabilities or quantitative properties from the final composition. A provider whose requirements are not met makes the composition ill-formed at compile time.
 
 ## Exclusive services and shared features
 
 Capabilities are intentionally split into two categories:
 
-- `ExclusiveCapability`: a service for which exactly zero or one provider may be selected in a composition. If two providers claim the same exclusive capability, compilation fails.
+- `ExclusiveCapability`: a service for which exactly zero or one provider may be selected in a composition. Multiple providers are a compile-time error.
 - `SharedCapability`: a feature fact that may legitimately be reported by multiple providers.
 
-The initial generic platform vocabulary includes exclusive service capabilities for execution, synchronization, queueing, memory, clock, entropy, GPIO and byte streams. Shared feature capabilities currently include processor affinity, interrupt-safe signalling, external memory, monotonic clocks and high-resolution clocks.
+The generic service vocabulary includes execution, synchronization, queueing, memory, clock, entropy, GPIO and byte streams. Shared feature capabilities include processor affinity, interrupt-safe signalling, external memory, monotonic/high-resolution clocks, static synchronization/queue storage and optional ISR queue operations.
 
 The capability vocabulary is intentionally extensible. Future backend and domain libraries can define additional capability types without modifying a central enum.
 
-## Provider requirements
-
-A provider may itself require capabilities or capability-property constraints from the final composition:
-
-```cpp
-struct SynchronizationProvider final
-    : ProviderDeclaration<
-          MyBackend,
-          CapabilitySet<Capability::Synchronization>,
-          RequirementSet<Capability::Execution>> {};
-```
-
-A composition containing this provider but no execution provider is ill-formed at compile time.
-
 ## Property inspection
 
-For a capability with exactly one selected provider, the composition exposes the provider's properties directly:
+For a capability with exactly one selected provider, the composition exposes the provider and its properties directly:
 
 ```cpp
+using ClockProvider = MyPlatform::ProviderFor<Capability::Clock>;
+
 static_assert(MyPlatform::HasProperty<Capability::Clock,
                                       PropertyKey::ClockFrequencyHz>);
-
 static_assert(MyPlatform::PropertyValue<Capability::Clock,
                                         PropertyKey::ClockFrequencyHz>
               == 10'000'000ULL);
 ```
 
-`ProviderFor<Capability>` and direct property inspection deliberately require a unique provider. Shared capabilities may have multiple contributors; requirements against shared capabilities are satisfied when at least one contributing provider meets the requested constraints.
+Shared capabilities may have multiple contributors; requirements against shared capabilities are satisfied when at least one contributing provider meets the requested constraints.
 
 ## Bus I/O and GPIO
 
@@ -144,21 +106,52 @@ See `docs/BUS_GPIO.md` for the detailed contract rationale.
 
 ## ByteStream
 
-`ByteStream::ProviderDeclaration` defines a readable/writable byte-stream service with explicit availability and transfer counts. `ByteStream::DefaultStream` maps to the canonical `Capability::ByteStream`; additional tagged streams use `Capability::ByteStreamEndpoint<Tag>` so a serial console, modem, file-like transport, network client, or hardware-specific stream can coexist in one Platform composition.
+`ByteStream::ProviderDeclaration` defines a readable/writable byte-stream service with explicit availability and transfer counts. `ByteStream::DefaultStream` maps to the canonical `Capability::ByteStream`; additional tagged streams use `Capability::ByteStreamEndpoint<Tag>` so multiple independent streams can coexist in one composition.
 
-The portable contract is deliberately small:
-
-- `Available(std::size_t&)` reports bytes immediately available for reading;
-- `Read(IO::MutableBuffer)` returns `IO::TransferResult`;
-- `Write(IO::ConstBuffer)` returns `IO::TransferResult`.
-
-A successful transfer may be partial. The returned count is always authoritative, and `IO::TransferResult::Completed(requested)` is provided when a caller requires an exact-length operation. The generic contract does not invent a universal timeout or non-blocking-write policy because those guarantees differ materially between stream implementations.
+The portable contract provides `Available`, `Read`, and `Write`. Read and write return `IO::TransferResult`, making partial successful transfers explicit rather than ambiguous.
 
 ## Entropy
 
-`Entropy::ProviderDeclaration` defines one selected entropy/random-byte source through `Fill(IO::MutableBuffer)`. Returning `IO::Result::Ok` means the entire requested buffer has been populated; partial entropy fills are not part of the generic contract.
+`Entropy::ProviderDeclaration` defines one selected random-byte source through `Fill(IO::MutableBuffer)`. `IO::Result::Ok` means the complete requested buffer has been populated.
 
-`Capability::HardwareRandomGenerator` may additionally be advertised when a provider is physically backed by a hardware RNG. This feature describes provenance only. `ESPressio-Platform` intentionally defines no fixed entropy-bits or cryptographic-strength property because those guarantees may depend on runtime hardware state, initialization, or an active physical noise source. Hardware-specific libraries may implement the same Entropy contract without belonging to an Arduino, ESP-IDF, or FreeRTOS backend.
+`Capability::HardwareRandomGenerator` may additionally describe hardware RNG provenance. The Platform contract intentionally does not invent fixed entropy-strength guarantees for providers whose physical quality depends on runtime hardware state.
+
+## Synchronization
+
+Synchronization is a compile-time provider family, not a runtime factory. A selected provider exposes concrete nested primitive types:
+
+```cpp
+using SyncProvider = MyPlatform::ProviderFor<Capability::Synchronization>;
+using Mutex = SyncProvider::Mutex;
+using Signal = SyncProvider::Signal;
+```
+
+The minimum mutex contract is `Lock`, `TryLock`, and `Unlock`. The minimum signal contract is `Give`, `Wait`, `TryWait`, and `Reset`.
+
+Optional behavior is explicit through shared capabilities:
+
+- `Capability::StaticSynchronizationStorage` — synchronization objects own deterministic static storage;
+- `Capability::RecursiveMutex` — the provider exposes `RecursiveMutex`;
+- `Capability::InterruptSafeSignalling` — its `Signal` exposes `GiveFromInterrupt()`.
+
+Timed waits are deliberately excluded from this first contract. Blocking operations mean wait until successful; `Try*` operations never wait. This avoids prematurely coupling synchronization to one timeout unit or clock-conversion policy.
+
+## Queue
+
+Queue is likewise a compile-time provider family:
+
+```cpp
+using QueueProvider = MyPlatform::ProviderFor<Capability::Queue>;
+using EventQueue = QueueProvider::Queue<EventEnvelope, 32>;
+```
+
+Every queue type publishes `Depth`, `ElementSizeBytes`, and `PayloadStorageBytes`, and supplies blocking `Send`/`Receive`, immediate `TrySend`/`TryReceive`, `Size`, and `Reset`.
+
+A provider advertising `Capability::StaticQueueStorage` additionally exposes each queue type's `ControlStorageBytes` and `TotalStaticStorageBytes`. The payload reservation is inherently known as `sizeof(T) * Depth`; concrete backends can therefore account for their control structures without hidden heap allocation.
+
+`Capability::QueueSendFromInterrupt` and `Capability::QueueReceiveFromInterrupt` explicitly advertise ISR operations. Their result reports both operation success and whether a higher-priority waiter was unblocked, without imposing a backend-specific ISR-yield mechanism on the generic contract.
+
+See `docs/SYNCHRONIZATION_QUEUE.md` for the detailed contract rationale and resource model.
 
 ## Backend libraries
 
@@ -174,13 +167,14 @@ Those libraries declare distinct backend identities and implement only contracts
 
 - Compile-time resolution is preferred whenever the composition can be known during the build.
 - Structural capability and configured quantitative limits are compile-time facts when the backend can declare them statically.
-- Runtime results are reserved for genuinely runtime facts such as driver initialization failure, physical hardware availability or transient resource exhaustion.
+- Runtime results are reserved for genuinely runtime facts such as driver initialization failure, physical hardware availability, contention or transient resource exhaustion.
 - No mutable "last provider wins" registry is part of the capability model.
 - Provider declarations carry no runtime state and impose no implementation shape beyond their static metadata.
 - Capability properties are strongly typed and scoped to the capability they describe.
+- Deterministic providers must not hide heap fallback behind contracts that advertise static resource ownership.
 - The Platform layer is independent of Arduino, ESP-IDF and FreeRTOS headers.
 - Domain-specific contracts such as Wi-Fi and Radio remain owned by their domain libraries; their backend implementations may still participate in Platform composition later.
 
 ## Validation
 
-`tests/run_native_tests.sh` compiles the positive C++17 tests and also verifies that invalid compositions fail compilation. Negative coverage includes duplicate exclusive providers, missing provider dependencies, missing consumer capabilities, duplicate property declarations, unsatisfied quantitative requirements, duplicate providers for the same bound I2C endpoint, and duplicate providers for the same tagged ByteStream endpoint.
+`tests/run_native_tests.sh` compiles the positive C++17 tests and verifies invalid compositions fail compilation. Negative coverage includes duplicate exclusive providers, missing provider dependencies, missing consumer capabilities, duplicate property declarations, unsatisfied quantitative requirements, duplicate providers for the same bound I2C endpoint, duplicate providers for the same tagged ByteStream endpoint, and duplicate Queue providers.
