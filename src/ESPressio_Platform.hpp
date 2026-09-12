@@ -7,3 +7,5 @@
 #include "ESPressio_PlatformGPIO.hpp"
 #include "ESPressio_PlatformByteStream.hpp"
 #include "ESPressio_PlatformEntropy.hpp"
+#include "ESPressio_PlatformSynchronization.hpp"
+#include "ESPressio_PlatformQueue.hpp"
