@@ -9,5 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout ESPressio-System composition foundation
+        uses: actions/checkout@v4
+        with:
+          repository: ESPressio-Development-Platform/ESPressio-System
+          ref: composition_framework
+          path: deps/ESPressio-System
       - name: Compile positive and negative capability contracts
         run: bash tests/run_native_tests.sh

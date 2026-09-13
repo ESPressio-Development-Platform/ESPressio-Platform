@@ -4,7 +4,13 @@ set -euo pipefail
 CXX="${CXX:-g++}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${ROOT}/.native-test-build"
-FLAGS=(-std=gnu++17 -Wall -Wextra -Werror -pedantic -I"${ROOT}/src")
+SYSTEM_SRC="${ROOT}/deps/ESPressio-System/src"
+FLAGS=(-std=gnu++17 -Wall -Wextra -Werror -pedantic -I"${ROOT}/src" -I"${SYSTEM_SRC}")
+
+if [[ ! -f "${SYSTEM_SRC}/ESPressio_CompositionFramework.hpp" ]]; then
+  echo "ERROR: ESPressio-System composition framework not found at ${SYSTEM_SRC}" >&2
+  exit 1
+fi
 
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
