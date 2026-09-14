@@ -23,7 +23,7 @@
   "dependencies": [
     {
       "name": "ESPressio-System",
-      "version": "https://github.com/ESPressio-Development-Platform/ESPressio-System.git#composition_framework"
+      "version": "https://github.com/ESPressio-Development-Platform/ESPressio-System.git#ota_v1"
     }
   ]
 }
