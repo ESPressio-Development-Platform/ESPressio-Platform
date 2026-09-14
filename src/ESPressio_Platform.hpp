@@ -9,4 +9,5 @@
 #include "ESPressio_PlatformEntropy.hpp"
 #include "ESPressio_PlatformSynchronization.hpp"
 #include "ESPressio_PlatformQueue.hpp"
+#include "ESPressio_PlatformOTALayoutGeneration.hpp"
 #include "ESPressio_PlatformOTA.hpp"
