@@ -59,6 +59,11 @@ struct OTAProvider final : ProviderDeclaration<
     }
 
     bool IsCurrentBootTrial() const noexcept { return trial; }
+    OTA::TrialBootStateResult InspectBootTargetTrialState(OTA::BootTargetIdentifier target) const noexcept {
+    return target
+        ? OTA::TrialBootStateResult{OTA::Status::Success, OTA::TrialBootState::NeverAttempted, 0}
+        : OTA::TrialBootStateResult{OTA::Status::Invalid, OTA::TrialBootState::Unknown, 0};
+}
     OTA::Result MarkCurrentBootValid() noexcept {
         committed = current;
         trial = false;
@@ -91,6 +96,7 @@ static_assert(OTA::IsApplicationImageStagingProviderV<OTAProvider>);
 static_assert(OTA::IsFilesystemImageStagingProviderV<OTAProvider>);
 static_assert(OTA::IsBootControlProviderV<OTAProvider>);
 static_assert(OTA::IsTrialBootProviderV<OTAProvider>);
+static_assert(OTA::HasTrialBootStateInspectionV<OTAProvider>);
 static_assert(OTA::IsSystemRestartProviderV<OTAProvider>);
 static_assert(OTA::IsStorageLayoutInspectionProviderV<OTAProvider>);
 static_assert(OTA::IsStorageLayoutTransitionProviderV<OTAProvider>);

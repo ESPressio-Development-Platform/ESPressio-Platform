@@ -71,6 +71,23 @@ struct Result final {
     constexpr explicit operator bool() const noexcept { return Code == Status::Success; }
 };
 
+enum class TrialBootState : std::uint8_t {
+    Unknown,
+    Untracked,
+    NeverAttempted,
+    Armed,
+    PendingValidation,
+    Accepted,
+    Rejected
+};
+
+struct TrialBootStateResult final {
+    Status Code{Status::Failed};
+    TrialBootState State{TrialBootState::Unknown};
+    std::int32_t NativeCode{0};
+    constexpr explicit operator bool() const noexcept { return Code == Status::Success; }
+};
+
 struct PreflightResult final {
     Status Code{Status::Failed};
     std::uint64_t RequiredBytes{0};
@@ -189,6 +206,18 @@ struct IsTrialBootProvider<T, std::void_t<
           noexcept(std::declval<T&>().MarkCurrentBootInvalid())> {};
 
 template <typename T, typename = void>
+struct HasTrialBootStateInspection : std::false_type {};
+
+template <typename T>
+struct HasTrialBootStateInspection<T, std::void_t<
+    decltype(std::declval<const T&>().InspectBootTargetTrialState(BootTargetIdentifier{}))>>
+    : std::bool_constant<
+          IsProviderV<T> &&
+          T::PlatformCapabilities::template Contains<Capability::TrialBoot> &&
+          std::is_same_v<decltype(std::declval<const T&>().InspectBootTargetTrialState(BootTargetIdentifier{})), TrialBootStateResult> &&
+          noexcept(std::declval<const T&>().InspectBootTargetTrialState(BootTargetIdentifier{}))> {};
+
+template <typename T, typename = void>
 struct IsSystemRestartProvider : std::false_type {};
 
 template <typename T>
@@ -245,6 +274,7 @@ template <typename T> inline constexpr bool IsApplicationImageStagingProviderV =
 template <typename T> inline constexpr bool IsFilesystemImageStagingProviderV = Detail::IsFilesystemImageStagingProvider<T>::value;
 template <typename T> inline constexpr bool IsBootControlProviderV = Detail::IsBootControlProvider<T>::value;
 template <typename T> inline constexpr bool IsTrialBootProviderV = Detail::IsTrialBootProvider<T>::value;
+template <typename T> inline constexpr bool HasTrialBootStateInspectionV = Detail::HasTrialBootStateInspection<T>::value;
 template <typename T> inline constexpr bool IsSystemRestartProviderV = Detail::IsSystemRestartProvider<T>::value;
 template <typename T> inline constexpr bool IsStorageLayoutInspectionProviderV = Detail::IsStorageLayoutInspectionProvider<T>::value;
 template <typename T> inline constexpr bool IsStorageLayoutTransitionProviderV = Detail::IsStorageLayoutTransitionProvider<T>::value;
